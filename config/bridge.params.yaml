@@ -10,6 +10,7 @@ hand_tracking_bridge:
     right_wrist_frame: right_wrist
     use_source_frame_id: false
     convert_to_right_handed: true
+    map_to_flu: true
     landmarks_are_wrist_relative: true
     qos_reliability: best_effort
     queue_size: 256

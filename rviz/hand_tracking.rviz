@@ -40,20 +40,31 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: true
+        left_wrist:
+          Value: true
+        right_wrist:
+          Value: true
+        world:
+          Value: true
       Marker Scale: 0.5
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: false
       Tree:
-        {}
+        world:
+          left_wrist:
+            {}
+          right_wrist:
+            {}
       Update Interval: 0
       Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
       Name: LeftMarkers
       Namespaces:
-        {}
+        left_bones: true
+        left_landmark_spheres: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -65,7 +76,8 @@ Visualization Manager:
       Enabled: true
       Name: RightMarkers
       Namespaces:
-        {}
+        right_bones: true
+        right_landmark_spheres: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -90,25 +102,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 1.6276819705963135
+      Distance: 2.600682497024536
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0
-        Y: 0
-        Z: 0
+        X: 0.1700565665960312
+        Y: 0.47227632999420166
+        Z: 0.7013792991638184
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.530398428440094
+      Pitch: 0.5053982734680176
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz_default_plugins)
-      Yaw: 0.9703980684280396
+      Yaw: 4.213581562042236
     Saved: ~
 Window Geometry:
   Displays:

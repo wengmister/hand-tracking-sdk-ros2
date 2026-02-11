@@ -7,6 +7,9 @@ from dataclasses import dataclass
 from builtin_interfaces.msg import Time
 from geometry_msgs.msg import Point, Pose, PoseArray, PoseStamped, Quaternion, TransformStamped
 from hand_tracking_sdk import HandFrame, HandSide, JointName
+from hand_tracking_sdk import (
+    unity_right_to_flu_position,
+)
 from std_msgs.msg import Header
 from visualization_msgs.msg import Marker, MarkerArray
 
@@ -46,17 +49,37 @@ def make_header(stamp: Time, frame_id: str) -> Header:
     return Header(stamp=stamp, frame_id=frame_id)
 
 
-def to_wrist_pose_stamped(frame: HandFrame, *, stamp: Time, frame_id: str) -> PoseStamped:
+def to_wrist_pose_stamped(
+    frame: HandFrame,
+    *,
+    stamp: Time,
+    frame_id: str,
+    map_to_flu: bool = False,
+) -> PoseStamped:
     """Convert one SDK frame to wrist pose message."""
+    x, y, z = _map_point_frame(
+        x=frame.wrist.x,
+        y=frame.wrist.y,
+        z=frame.wrist.z,
+        map_to_flu=map_to_flu,
+    )
+    qx, qy, qz, qw = _map_quaternion_frame(
+        qx=frame.wrist.qx,
+        qy=frame.wrist.qy,
+        qz=frame.wrist.qz,
+        qw=frame.wrist.qw,
+        map_to_flu=map_to_flu,
+    )
+
     return PoseStamped(
         header=make_header(stamp=stamp, frame_id=frame_id),
         pose=Pose(
-            position=Point(x=frame.wrist.x, y=frame.wrist.y, z=frame.wrist.z),
+            position=Point(x=x, y=y, z=z),
             orientation=Quaternion(
-                x=frame.wrist.qx,
-                y=frame.wrist.qy,
-                z=frame.wrist.qz,
-                w=frame.wrist.qw,
+                x=qx,
+                y=qy,
+                z=qz,
+                w=qw,
             ),
         ),
     )
@@ -68,18 +91,28 @@ def to_landmarks_pose_array(
     stamp: Time,
     frame_id: str,
     landmarks_are_wrist_relative: bool = False,
+    map_to_flu: bool = False,
 ) -> PoseArray:
     """Convert one SDK frame to landmarks ``PoseArray`` in publish coordinates."""
     points = frame.landmarks.points
     if landmarks_are_wrist_relative:
         points = _landmarks_wrist_local_to_world(points=points, frame=frame)
 
+    mapped_points = [
+        _map_point_frame(
+            x=x,
+            y=y,
+            z=z,
+            map_to_flu=map_to_flu,
+        )
+        for x, y, z in points
+    ]
     poses = [
         Pose(
             position=Point(x=x, y=y, z=z),
             orientation=Quaternion(x=0.0, y=0.0, z=0.0, w=1.0),
         )
-        for x, y, z in points
+        for x, y, z in mapped_points
     ]
     return PoseArray(header=make_header(stamp=stamp, frame_id=frame_id), poses=poses)
 
@@ -90,18 +123,33 @@ def to_wrist_transform(
     stamp: Time,
     world_frame: str,
     child_frame_id: str,
+    map_to_flu: bool = False,
 ) -> TransformStamped:
     """Convert one SDK frame to wrist transform."""
+    x, y, z = _map_point_frame(
+        x=frame.wrist.x,
+        y=frame.wrist.y,
+        z=frame.wrist.z,
+        map_to_flu=map_to_flu,
+    )
+    qx, qy, qz, qw = _map_quaternion_frame(
+        qx=frame.wrist.qx,
+        qy=frame.wrist.qy,
+        qz=frame.wrist.qz,
+        qw=frame.wrist.qw,
+        map_to_flu=map_to_flu,
+    )
+
     transform = TransformStamped()
     transform.header = make_header(stamp=stamp, frame_id=world_frame)
     transform.child_frame_id = child_frame_id
-    transform.transform.translation.x = frame.wrist.x
-    transform.transform.translation.y = frame.wrist.y
-    transform.transform.translation.z = frame.wrist.z
-    transform.transform.rotation.x = frame.wrist.qx
-    transform.transform.rotation.y = frame.wrist.qy
-    transform.transform.rotation.z = frame.wrist.qz
-    transform.transform.rotation.w = frame.wrist.qw
+    transform.transform.translation.x = x
+    transform.transform.translation.y = y
+    transform.transform.translation.z = z
+    transform.transform.rotation.x = qx
+    transform.transform.rotation.y = qy
+    transform.transform.rotation.z = qz
+    transform.transform.rotation.w = qw
     return transform
 
 
@@ -112,11 +160,21 @@ def to_marker_array(
     frame_id: str,
     side_ns: str,
     landmarks_are_wrist_relative: bool = False,
+    map_to_flu: bool = False,
 ) -> MarkerArray:
     """Build landmark and bone markers for RViz."""
     points = frame.landmarks.points
     if landmarks_are_wrist_relative:
         points = _landmarks_wrist_local_to_world(points=points, frame=frame)
+    points = tuple(
+        _map_point_frame(
+            x=x,
+            y=y,
+            z=z,
+            map_to_flu=map_to_flu,
+        )
+        for x, y, z in points
+    )
 
     marker_array = MarkerArray()
 
@@ -176,6 +234,41 @@ def is_valid_landmark_count(frame: HandFrame) -> bool:
     return len(frame.landmarks.points) == len(JointName)
 
 
+def _map_point_frame(
+    *,
+    x: float,
+    y: float,
+    z: float,
+    map_to_flu: bool,
+) -> tuple[float, float, float]:
+    """Map SDK coordinates to FLU frame when requested."""
+    if not map_to_flu:
+        return (x, y, z)
+    return unity_right_to_flu_position(x, y, z)
+
+
+def _map_quaternion_frame(
+    *,
+    qx: float,
+    qy: float,
+    qz: float,
+    qw: float,
+    map_to_flu: bool,
+) -> tuple[float, float, float, float]:
+    """Map SDK quaternion basis to FLU frame when requested."""
+    if not map_to_flu:
+        return (qx, qy, qz, qw)
+
+    matrix = _quaternion_to_matrix(qx=qx, qy=qy, qz=qz, qw=qw)
+    basis = (
+        (0.0, 0.0, 1.0),
+        (-1.0, 0.0, 0.0),
+        (0.0, -1.0, 0.0),
+    )
+    transformed = _matmul(_matmul(basis, matrix), _transpose(basis))
+    return _matrix_to_quaternion(transformed)
+
+
 def _landmarks_wrist_local_to_world(
     *,
     points: tuple[tuple[float, float, float], ...],
@@ -226,3 +319,111 @@ def _rotate_vector_by_quaternion(
     ry = y + qw_n * ty + (qz_n * tx - qx_n * tz)
     rz = z + qw_n * tz + (qx_n * ty - qy_n * tx)
     return (rx, ry, rz)
+
+
+def _quaternion_to_matrix(
+    *,
+    qx: float,
+    qy: float,
+    qz: float,
+    qw: float,
+) -> tuple[tuple[float, float, float], tuple[float, float, float], tuple[float, float, float]]:
+    """Convert quaternion components into a rotation matrix."""
+    xx = qx * qx
+    yy = qy * qy
+    zz = qz * qz
+    xy = qx * qy
+    xz = qx * qz
+    yz = qy * qz
+    wx = qw * qx
+    wy = qw * qy
+    wz = qw * qz
+
+    return (
+        (1.0 - 2.0 * (yy + zz), 2.0 * (xy - wz), 2.0 * (xz + wy)),
+        (2.0 * (xy + wz), 1.0 - 2.0 * (xx + zz), 2.0 * (yz - wx)),
+        (2.0 * (xz - wy), 2.0 * (yz + wx), 1.0 - 2.0 * (xx + yy)),
+    )
+
+
+def _matrix_to_quaternion(
+    matrix: tuple[
+        tuple[float, float, float],
+        tuple[float, float, float],
+        tuple[float, float, float],
+    ],
+) -> tuple[float, float, float, float]:
+    """Convert a rotation matrix into normalized quaternion components."""
+    m00, m01, m02 = matrix[0]
+    m10, m11, m12 = matrix[1]
+    m20, m21, m22 = matrix[2]
+
+    trace = m00 + m11 + m22
+    if trace > 0.0:
+        s = (trace + 1.0) ** 0.5 * 2.0
+        qw = 0.25 * s
+        qx = (m21 - m12) / s
+        qy = (m02 - m20) / s
+        qz = (m10 - m01) / s
+    elif m00 > m11 and m00 > m22:
+        s = (1.0 + m00 - m11 - m22) ** 0.5 * 2.0
+        qw = (m21 - m12) / s
+        qx = 0.25 * s
+        qy = (m01 + m10) / s
+        qz = (m02 + m20) / s
+    elif m11 > m22:
+        s = (1.0 + m11 - m00 - m22) ** 0.5 * 2.0
+        qw = (m02 - m20) / s
+        qx = (m01 + m10) / s
+        qy = 0.25 * s
+        qz = (m12 + m21) / s
+    else:
+        s = (1.0 + m22 - m00 - m11) ** 0.5 * 2.0
+        qw = (m10 - m01) / s
+        qx = (m02 + m20) / s
+        qy = (m12 + m21) / s
+        qz = 0.25 * s
+
+    norm = (qx * qx + qy * qy + qz * qz + qw * qw) ** 0.5
+    if norm == 0.0:
+        return (0.0, 0.0, 0.0, 1.0)
+    return (qx / norm, qy / norm, qz / norm, qw / norm)
+
+
+def _transpose(
+    matrix: tuple[
+        tuple[float, float, float],
+        tuple[float, float, float],
+        tuple[float, float, float],
+    ],
+) -> tuple[tuple[float, float, float], tuple[float, float, float], tuple[float, float, float]]:
+    """Return transpose of a 3x3 matrix."""
+    return (
+        (matrix[0][0], matrix[1][0], matrix[2][0]),
+        (matrix[0][1], matrix[1][1], matrix[2][1]),
+        (matrix[0][2], matrix[1][2], matrix[2][2]),
+    )
+
+
+def _matmul(
+    a: tuple[tuple[float, float, float], tuple[float, float, float], tuple[float, float, float]],
+    b: tuple[tuple[float, float, float], tuple[float, float, float], tuple[float, float, float]],
+) -> tuple[tuple[float, float, float], tuple[float, float, float], tuple[float, float, float]]:
+    """Multiply two 3x3 matrices."""
+    return (
+        (
+            a[0][0] * b[0][0] + a[0][1] * b[1][0] + a[0][2] * b[2][0],
+            a[0][0] * b[0][1] + a[0][1] * b[1][1] + a[0][2] * b[2][1],
+            a[0][0] * b[0][2] + a[0][1] * b[1][2] + a[0][2] * b[2][2],
+        ),
+        (
+            a[1][0] * b[0][0] + a[1][1] * b[1][0] + a[1][2] * b[2][0],
+            a[1][0] * b[0][1] + a[1][1] * b[1][1] + a[1][2] * b[2][1],
+            a[1][0] * b[0][2] + a[1][1] * b[1][2] + a[1][2] * b[2][2],
+        ),
+        (
+            a[2][0] * b[0][0] + a[2][1] * b[1][0] + a[2][2] * b[2][0],
+            a[2][0] * b[0][1] + a[2][1] * b[1][1] + a[2][2] * b[2][1],
+            a[2][0] * b[0][2] + a[2][1] * b[1][2] + a[2][2] * b[2][2],
+        ),
+    )
