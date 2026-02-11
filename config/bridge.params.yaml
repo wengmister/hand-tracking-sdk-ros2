@@ -1,0 +1,19 @@
+hand_tracking_bridge:
+  ros__parameters:
+    transport_mode: tcp_server
+    host: 0.0.0.0
+    port: 9000
+    timeout_s: 1.0
+    reconnect_delay_s: 0.25
+    world_frame: world
+    left_wrist_frame: left_wrist
+    right_wrist_frame: right_wrist
+    use_source_frame_id: false
+    convert_to_right_handed: true
+    qos_reliability: best_effort
+    queue_size: 256
+    enable_tf: true
+    enable_pose_array: true
+    enable_markers: true
+    enable_diagnostics: true
+    diagnostics_period_s: 1.0
