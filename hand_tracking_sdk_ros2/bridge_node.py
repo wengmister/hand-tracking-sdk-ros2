@@ -69,7 +69,7 @@ class HandTrackingBridgeNode(Node):
         self._world_frame = world_frame
         self._side_frames = SideFrames(left=self._left_wrist_frame, right=self._right_wrist_frame)
 
-        self._publishers = BridgePublishers(
+        self._bridge_publishers = BridgePublishers(
             self,
             sensor_qos=qos,
             enable_pose_array=self._enable_pose_array,
@@ -101,7 +101,7 @@ class HandTrackingBridgeNode(Node):
         if self._enable_diagnostics:
             self.create_timer(diagnostics_period_s, self._publish_diagnostics)
 
-        self._publishers.publish_joint_names([joint.value for joint in JointName])
+        self._bridge_publishers.publish_joint_names([joint.value for joint in JointName])
 
         self.get_logger().info(
             "Started hand_tracking_bridge transport=%s host=%s port=%d qos=%s"
@@ -137,10 +137,10 @@ class HandTrackingBridgeNode(Node):
                 continue
 
             wrist_msg = to_wrist_pose_stamped(frame, stamp=stamp, frame_id=frame_id)
-            self._publishers.publish_wrist(frame.side, wrist_msg)
+            self._bridge_publishers.publish_wrist(frame.side, wrist_msg)
 
             landmarks_msg = to_landmarks_pose_array(frame, stamp=stamp, frame_id=frame_id)
-            self._publishers.publish_landmarks(frame.side, landmarks_msg)
+            self._bridge_publishers.publish_landmarks(frame.side, landmarks_msg)
 
             markers_msg = to_marker_array(
                 frame,
@@ -148,7 +148,7 @@ class HandTrackingBridgeNode(Node):
                 frame_id=frame_id,
                 side_ns=frame.side.value.lower(),
             )
-            self._publishers.publish_markers(frame.side, markers_msg)
+            self._bridge_publishers.publish_markers(frame.side, markers_msg)
 
             self._tf_publisher.publish(frame, stamp)
 
