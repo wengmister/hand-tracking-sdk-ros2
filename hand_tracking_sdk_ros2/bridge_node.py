@@ -2,17 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Final
-
 import rclpy
-from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
-from geometry_msgs.msg import PoseArray, PoseStamped
-from hand_tracking_sdk import HandSide, JointName
+from hand_tracking_sdk import JointName
 from rclpy.node import Node
-from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
-from std_msgs.msg import String
 from tf2_ros import TransformBroadcaster
-from visualization_msgs.msg import MarkerArray
 
 from .adapters import (
     SideFrames,
@@ -22,11 +15,11 @@ from .adapters import (
     to_landmarks_pose_array,
     to_marker_array,
     to_wrist_pose_stamped,
-    to_wrist_transform,
 )
+from .diagnostics import DiagnosticsPublisher
+from .publishers import BridgePublishers, sensor_qos_profile
 from .runtime import FrameRuntime
-
-JOINT_NAMES_TOPIC: Final[str] = "hands/joint_names"
+from .tf_broadcaster import WristTfPublisher
 
 
 class HandTrackingBridgeNode(Node):
@@ -71,47 +64,25 @@ class HandTrackingBridgeNode(Node):
         self._enable_diagnostics = bool(self.get_parameter("enable_diagnostics").value)
         diagnostics_period_s = float(self.get_parameter("diagnostics_period_s").value)
 
-        if qos_reliability == "reliable":
-            reliability = ReliabilityPolicy.RELIABLE
-        else:
-            reliability = ReliabilityPolicy.BEST_EFFORT
-
-        qos = QoSProfile(
-            reliability=reliability,
-            durability=DurabilityPolicy.VOLATILE,
-            history=HistoryPolicy.KEEP_LAST,
-            depth=10,
-        )
+        qos = sensor_qos_profile(qos_reliability)
 
         self._world_frame = world_frame
         self._side_frames = SideFrames(left=self._left_wrist_frame, right=self._right_wrist_frame)
 
-        self._left_wrist_pub = self.create_publisher(PoseStamped, "hands/left/wrist_pose", qos)
-        self._right_wrist_pub = self.create_publisher(PoseStamped, "hands/right/wrist_pose", qos)
-
-        self._left_landmarks_pub = self.create_publisher(PoseArray, "hands/left/landmarks", qos)
-        self._right_landmarks_pub = self.create_publisher(PoseArray, "hands/right/landmarks", qos)
-
-        self._left_markers_pub = self.create_publisher(MarkerArray, "hands/left/markers", qos)
-        self._right_markers_pub = self.create_publisher(MarkerArray, "hands/right/markers", qos)
-
-        self._joint_names_pub = self.create_publisher(
-            String,
-            JOINT_NAMES_TOPIC,
-            QoSProfile(
-                reliability=ReliabilityPolicy.RELIABLE,
-                durability=DurabilityPolicy.TRANSIENT_LOCAL,
-                history=HistoryPolicy.KEEP_LAST,
-                depth=1,
-            ),
+        self._publishers = BridgePublishers(
+            self,
+            sensor_qos=qos,
+            enable_pose_array=self._enable_pose_array,
+            enable_markers=self._enable_markers,
         )
-
-        self._tf_broadcaster = TransformBroadcaster(self)
-        self._diag_pub = self.create_publisher(
-            DiagnosticArray,
-            "/diagnostics",
-            QoSProfile(depth=10),
+        self._tf_publisher = WristTfPublisher(
+            TransformBroadcaster(self),
+            enabled=self._enable_tf,
+            world_frame=self._world_frame,
+            left_wrist_frame=self._left_wrist_frame,
+            right_wrist_frame=self._right_wrist_frame,
         )
+        self._diagnostics = DiagnosticsPublisher(self)
 
         self._runtime = FrameRuntime(
             transport_mode=transport_mode,
@@ -130,7 +101,7 @@ class HandTrackingBridgeNode(Node):
         if self._enable_diagnostics:
             self.create_timer(diagnostics_period_s, self._publish_diagnostics)
 
-        self._publish_joint_names_once()
+        self._publishers.publish_joint_names([joint.value for joint in JointName])
 
         self.get_logger().info(
             "Started hand_tracking_bridge transport=%s host=%s port=%d qos=%s"
@@ -166,83 +137,29 @@ class HandTrackingBridgeNode(Node):
                 continue
 
             wrist_msg = to_wrist_pose_stamped(frame, stamp=stamp, frame_id=frame_id)
+            self._publishers.publish_wrist(frame.side, wrist_msg)
 
-            if frame.side == HandSide.LEFT:
-                self._left_wrist_pub.publish(wrist_msg)
-            else:
-                self._right_wrist_pub.publish(wrist_msg)
+            landmarks_msg = to_landmarks_pose_array(frame, stamp=stamp, frame_id=frame_id)
+            self._publishers.publish_landmarks(frame.side, landmarks_msg)
 
-            if self._enable_pose_array:
-                landmarks_msg = to_landmarks_pose_array(frame, stamp=stamp, frame_id=frame_id)
-                if frame.side == HandSide.LEFT:
-                    self._left_landmarks_pub.publish(landmarks_msg)
-                else:
-                    self._right_landmarks_pub.publish(landmarks_msg)
+            markers_msg = to_marker_array(
+                frame,
+                stamp=stamp,
+                frame_id=frame_id,
+                side_ns=frame.side.value.lower(),
+            )
+            self._publishers.publish_markers(frame.side, markers_msg)
 
-            if self._enable_markers:
-                markers_msg = to_marker_array(
-                    frame,
-                    stamp=stamp,
-                    frame_id=frame_id,
-                    side_ns=frame.side.value.lower(),
-                )
-                if frame.side == HandSide.LEFT:
-                    self._left_markers_pub.publish(markers_msg)
-                else:
-                    self._right_markers_pub.publish(markers_msg)
-
-            if self._enable_tf:
-                if frame.side == HandSide.LEFT:
-                    child_frame_id = self._left_wrist_frame
-                else:
-                    child_frame_id = self._right_wrist_frame
-                tf_msg = to_wrist_transform(
-                    frame,
-                    stamp=stamp,
-                    world_frame=self._world_frame,
-                    child_frame_id=child_frame_id,
-                )
-                self._tf_broadcaster.sendTransform(tf_msg)
+            self._tf_publisher.publish(frame, stamp)
 
             self._last_frame_time = self.get_clock().now()
 
-    def _publish_joint_names_once(self) -> None:
-        names = [joint.value for joint in JointName]
-        message = String(data=",".join(names))
-        self._joint_names_pub.publish(message)
-
     def _publish_diagnostics(self) -> None:
-        diag = DiagnosticArray()
-        diag.header.stamp = self.get_clock().now().to_msg()
-
-        runtime_stats = self._runtime.get_stats()
-        elapsed = self.get_clock().now() - self._last_frame_time
-        since_last_frame = elapsed.nanoseconds / 1_000_000.0
-
-        status = DiagnosticStatus()
-        status.name = "hand_tracking_sdk_ros2:stream"
-        status.hardware_id = "hts_bridge"
-
-        if since_last_frame > 2_000.0:
-            status.level = DiagnosticStatus.WARN
-            status.message = "stream stale"
-        elif self._runtime.get_last_exception() is not None:
-            status.level = DiagnosticStatus.ERROR
-            status.message = "runtime error"
-        else:
-            status.level = DiagnosticStatus.OK
-            status.message = "ok"
-
-        status.values = [
-            KeyValue(key="frames_in", value=str(runtime_stats.frames_in)),
-            KeyValue(key="frames_out", value=str(runtime_stats.frames_out)),
-            KeyValue(key="frames_dropped_queue", value=str(runtime_stats.frames_dropped_queue)),
-            KeyValue(key="loop_errors", value=str(runtime_stats.loop_errors)),
-            KeyValue(key="last_frame_age_ms", value=f"{since_last_frame:.2f}"),
-        ]
-
-        diag.status.append(status)
-        self._diag_pub.publish(diag)
+        self._diagnostics.publish(
+            runtime_stats=self._runtime.get_stats(),
+            last_frame_time=self._last_frame_time,
+            last_exception=self._runtime.get_last_exception(),
+        )
 
 
 def main(args: list[str] | None = None) -> None:
