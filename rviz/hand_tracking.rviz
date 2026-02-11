@@ -16,23 +16,23 @@ Visualization Manager:
       Enabled: true
     - Class: rviz_default_plugins/PoseArray
       Name: LeftLandmarks
-      Enabled: true
+      Enabled: false
       Topic:
         Value: /hands/left/landmarks
     - Class: rviz_default_plugins/PoseArray
       Name: RightLandmarks
-      Enabled: true
+      Enabled: false
       Topic:
         Value: /hands/right/landmarks
     - Class: rviz_default_plugins/MarkerArray
       Name: LeftMarkers
       Enabled: true
-      Marker Topic:
+      Topic:
         Value: /hands/left/markers
     - Class: rviz_default_plugins/MarkerArray
       Name: RightMarkers
       Enabled: true
-      Marker Topic:
+      Topic:
         Value: /hands/right/markers
   Global Options:
     Fixed Frame: world
