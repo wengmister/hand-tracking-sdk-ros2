@@ -67,7 +67,8 @@ class FrameRuntime:
         self._thread.start()
 
     def stop(self) -> None:
-        """Request background thread stop.
+        """
+        Request background thread stop.
 
         Note: SDK iterators can block in transport receive. Thread is daemonized
         so process shutdown still completes cleanly.
