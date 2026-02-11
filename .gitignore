@@ -1,0 +1,23 @@
+# Python cache/artifacts
+__pycache__/
+*.py[oc]
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv/
+
+# IDE/system
+.DS_Store
+.vscode/
+.idea/
+
+# Sphinx docs build artifacts
+docs/_build/
