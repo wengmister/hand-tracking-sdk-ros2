@@ -27,7 +27,10 @@ def generate_launch_description() -> LaunchDescription:
                 executable="hand_tracking_bridge",
                 name="hand_tracking_bridge",
                 output="screen",
-                parameters=[params_file],
+                parameters=[
+                    params_file,
+                    {"qos_reliability": "reliable"},
+                ],
             ),
             Node(
                 package="rviz2",

@@ -62,14 +62,24 @@ def to_wrist_pose_stamped(frame: HandFrame, *, stamp: Time, frame_id: str) -> Po
     )
 
 
-def to_landmarks_pose_array(frame: HandFrame, *, stamp: Time, frame_id: str) -> PoseArray:
-    """Convert one SDK frame to landmarks ``PoseArray``."""
+def to_landmarks_pose_array(
+    frame: HandFrame,
+    *,
+    stamp: Time,
+    frame_id: str,
+    landmarks_are_wrist_relative: bool = False,
+) -> PoseArray:
+    """Convert one SDK frame to landmarks ``PoseArray`` in publish coordinates."""
+    points = frame.landmarks.points
+    if landmarks_are_wrist_relative:
+        points = _landmarks_wrist_local_to_world(points=points, frame=frame)
+
     poses = [
         Pose(
             position=Point(x=x, y=y, z=z),
             orientation=Quaternion(x=0.0, y=0.0, z=0.0, w=1.0),
         )
-        for x, y, z in frame.landmarks.points
+        for x, y, z in points
     ]
     return PoseArray(header=make_header(stamp=stamp, frame_id=frame_id), poses=poses)
 
@@ -101,8 +111,13 @@ def to_marker_array(
     stamp: Time,
     frame_id: str,
     side_ns: str,
+    landmarks_are_wrist_relative: bool = False,
 ) -> MarkerArray:
     """Build landmark and bone markers for RViz."""
+    points = frame.landmarks.points
+    if landmarks_are_wrist_relative:
+        points = _landmarks_wrist_local_to_world(points=points, frame=frame)
+
     marker_array = MarkerArray()
 
     points_marker = Marker()
@@ -123,7 +138,7 @@ def to_marker_array(
         points_marker.color.g = 0.6
         points_marker.color.b = 1.0
     points_marker.color.a = 1.0
-    points_marker.points = [Point(x=x, y=y, z=z) for x, y, z in frame.landmarks.points]
+    points_marker.points = [Point(x=x, y=y, z=z) for x, y, z in points]
 
     line_marker = Marker()
     line_marker.header = make_header(stamp=stamp, frame_id=frame_id)
@@ -135,8 +150,8 @@ def to_marker_array(
     line_marker.color = points_marker.color
 
     for idx_a, idx_b in BONE_EDGES:
-        pa = frame.landmarks.points[idx_a]
-        pb = frame.landmarks.points[idx_b]
+        pa = points[idx_a]
+        pb = points[idx_b]
         line_marker.points.append(Point(x=pa[0], y=pa[1], z=pa[2]))
         line_marker.points.append(Point(x=pb[0], y=pb[1], z=pb[2]))
 
@@ -148,3 +163,55 @@ def to_marker_array(
 def is_valid_landmark_count(frame: HandFrame) -> bool:
     """Return whether frame carries expected landmark point count."""
     return len(frame.landmarks.points) == len(JointName)
+
+
+def _landmarks_wrist_local_to_world(
+    *,
+    points: tuple[tuple[float, float, float], ...],
+    frame: HandFrame,
+) -> tuple[tuple[float, float, float], ...]:
+    """Transform wrist-local landmark points into world coordinates."""
+    world_points: list[tuple[float, float, float]] = []
+    for x, y, z in points:
+        rx, ry, rz = _rotate_vector_by_quaternion(
+            x=x,
+            y=y,
+            z=z,
+            qx=frame.wrist.qx,
+            qy=frame.wrist.qy,
+            qz=frame.wrist.qz,
+            qw=frame.wrist.qw,
+        )
+        world_points.append((rx + frame.wrist.x, ry + frame.wrist.y, rz + frame.wrist.z))
+    return tuple(world_points)
+
+
+def _rotate_vector_by_quaternion(
+    *,
+    x: float,
+    y: float,
+    z: float,
+    qx: float,
+    qy: float,
+    qz: float,
+    qw: float,
+) -> tuple[float, float, float]:
+    """Rotate a vector using quaternion orientation."""
+    norm = (qx * qx + qy * qy + qz * qz + qw * qw) ** 0.5
+    if norm == 0.0:
+        return (x, y, z)
+
+    qx_n = qx / norm
+    qy_n = qy / norm
+    qz_n = qz / norm
+    qw_n = qw / norm
+
+    # Equivalent to q * v * conj(q), expanded for speed.
+    tx = 2.0 * (qy_n * z - qz_n * y)
+    ty = 2.0 * (qz_n * x - qx_n * z)
+    tz = 2.0 * (qx_n * y - qy_n * x)
+
+    rx = x + qw_n * tx + (qy_n * tz - qz_n * ty)
+    ry = y + qw_n * ty + (qz_n * tx - qx_n * tz)
+    rz = z + qw_n * tz + (qx_n * ty - qy_n * tx)
+    return (rx, ry, rz)

@@ -38,6 +38,7 @@ class HandTrackingBridgeNode(Node):
         self.declare_parameter("right_wrist_frame", "right_wrist")
         self.declare_parameter("use_source_frame_id", False)
         self.declare_parameter("convert_to_right_handed", True)
+        self.declare_parameter("landmarks_are_wrist_relative", True)
         self.declare_parameter("qos_reliability", "best_effort")
         self.declare_parameter("queue_size", 256)
         self.declare_parameter("enable_tf", True)
@@ -56,6 +57,9 @@ class HandTrackingBridgeNode(Node):
         self._right_wrist_frame = str(self.get_parameter("right_wrist_frame").value)
         self._use_source_frame_id = bool(self.get_parameter("use_source_frame_id").value)
         convert_to_right_handed = bool(self.get_parameter("convert_to_right_handed").value)
+        self._landmarks_are_wrist_relative = bool(
+            self.get_parameter("landmarks_are_wrist_relative").value
+        )
         qos_reliability = str(self.get_parameter("qos_reliability").value)
         queue_size = int(self.get_parameter("queue_size").value)
         self._enable_tf = bool(self.get_parameter("enable_tf").value)
@@ -139,14 +143,25 @@ class HandTrackingBridgeNode(Node):
             wrist_msg = to_wrist_pose_stamped(frame, stamp=stamp, frame_id=frame_id)
             self._bridge_publishers.publish_wrist(frame.side, wrist_msg)
 
-            landmarks_msg = to_landmarks_pose_array(frame, stamp=stamp, frame_id=frame_id)
+            if self._landmarks_are_wrist_relative:
+                landmarks_frame_id = self._world_frame
+            else:
+                landmarks_frame_id = frame_id
+
+            landmarks_msg = to_landmarks_pose_array(
+                frame,
+                stamp=stamp,
+                frame_id=landmarks_frame_id,
+                landmarks_are_wrist_relative=self._landmarks_are_wrist_relative,
+            )
             self._bridge_publishers.publish_landmarks(frame.side, landmarks_msg)
 
             markers_msg = to_marker_array(
                 frame,
                 stamp=stamp,
-                frame_id=frame_id,
+                frame_id=landmarks_frame_id,
                 side_ns=frame.side.value.lower(),
+                landmarks_are_wrist_relative=self._landmarks_are_wrist_relative,
             )
             self._bridge_publishers.publish_markers(frame.side, markers_msg)
 
