@@ -2,6 +2,9 @@
 
 ROS 2 bridge package for [`hand-tracking-sdk`](https://github.com/wengmister/hand-tracking-sdk).
 
+>[!IMPORTANT]
+>This repository is under active development. Expect breaking changes to come.
+
 ## Core Dependency
 
 This package treats `hand-tracking-sdk` as a required runtime dependency and
