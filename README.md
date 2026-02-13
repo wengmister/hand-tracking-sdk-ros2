@@ -25,15 +25,15 @@ Install dependency in the same Python interpreter used by ROS:
 python3 -m pip install "hand-tracking-sdk>=1.0.0,<2.0.0"
 ```
 
-## Run
-
-Build and source workspace:
+## Build
 
 ```bash
 cd ros-ws
 colcon build --symlink-install --packages-select hand_tracking_sdk_ros2
 source install/setup.bash
 ```
+
+## Run
 
 Run bridge with default config:
 
@@ -76,16 +76,6 @@ ros2 launch hand_tracking_sdk_ros2 view_hands.launch.py
   - bridge default is `best_effort` (`bridge.params.yaml`)
   - RViz launch overrides to `reliable`
 
-## Key Parameters
-
-- `transport_mode`: `tcp_server` or `udp_client`
-- `host`, `port`, `timeout_s`, `reconnect_delay_s`
-- `world_frame`, `left_wrist_frame`, `right_wrist_frame`
-- `landmarks_are_wrist_relative`
-- `qos_reliability`: `best_effort` or `reliable`
-- `enable_tf`, `enable_pose_array`, `enable_markers`, `enable_diagnostics`
-- `diagnostics_period_s`, `queue_size`
-
 ## QoS Recommendations
 
 - `best_effort` (recommended default for live tracking):
@@ -94,6 +84,82 @@ ros2 launch hand_tracking_sdk_ros2 view_hands.launch.py
 - `reliable`:
   - Better for wired LAN/localhost and tooling sessions where delivery completeness matters.
   - Recommended when launching RViz with `view_hands.launch.py`.
+
+## Parameters
+
+The default parameter file is `config/bridge.params.yaml`.
+
+| Parameter | Type | Default | Notes |
+|---|---|---:|---|
+| `transport_mode` | `string` | `tcp_server` | SDK transport mode (`udp`, `tcp_server`, `tcp_client`). |
+| `host` | `string` | `0.0.0.0` | Bind/connect host according to transport mode. |
+| `port` | `int` | `5555` | Transport port. |
+| `timeout_s` | `float` | `1.0` | SDK socket read/connect timeout seconds. |
+| `reconnect_delay_s` | `float` | `0.25` | TCP client reconnect delay seconds. |
+| `world_frame` | `string` | `world` | Parent frame used for wrist TF and world-space landmarks. |
+| `left_wrist_frame` | `string` | `left_wrist` | Child TF frame for left wrist. |
+| `right_wrist_frame` | `string` | `right_wrist` | Child TF frame for right wrist. |
+| `use_source_frame_id` | `bool` | `false` | Use incoming `frame_id` from SDK frame when present. |
+| `landmarks_are_wrist_relative` | `bool` | `true` | Rotate/translate landmarks by wrist pose before publish. |
+| `qos_reliability` | `string` | `best_effort` | `best_effort` or `reliable`. |
+| `queue_size` | `int` | `256` | Runtime frame queue size before oldest-frame drop. |
+| `enable_tf` | `bool` | `true` | Enable wrist TF publishing. |
+| `enable_pose_array` | `bool` | `false` | Enable `/hands/*/landmarks` `PoseArray` topics. |
+| `enable_markers` | `bool` | `true` | Enable `/hands/*/markers` `MarkerArray` topics. |
+| `enable_diagnostics` | `bool` | `true` | Enable `/diagnostics` publishing. |
+| `diagnostics_period_s` | `float` | `1.0` | Diagnostics publish period seconds. |
+
+## Verification
+
+Build and test package:
+
+```bash
+cd ros-ws
+colcon build --symlink-install --packages-select hand_tracking_sdk_ros2
+colcon test --packages-select hand_tracking_sdk_ros2 --event-handlers console_direct+
+colcon test-result --verbose --all
+```
+
+Runtime verification:
+
+```bash
+source ros-ws/install/setup.bash
+ros2 launch hand_tracking_sdk_ros2 bridge.launch.py
+```
+
+In another shell:
+
+```bash
+source ros-ws/install/setup.bash
+ros2 topic list | grep hands
+ros2 topic hz /hands/left/markers
+ros2 topic echo /hands/joint_names --once
+ros2 run tf2_ros tf2_echo world left_wrist
+```
+
+RViz bring-up:
+
+```bash
+source ros-ws/install/setup.bash
+ros2 launch hand_tracking_sdk_ros2 view_hands.launch.py
+```
+
+## Troubleshooting
+
+- No hand topics beyond `/rosout` and `/parameter_events`:
+  - Confirm bridge process stays alive in launch output.
+  - Verify SDK transport settings (`transport_mode`, `host`, `port`) match sender.
+- RViz shows no markers:
+  - Use `view_hands.launch.py` (it overrides bridge QoS to `reliable`).
+  - Check marker stream exists: `ros2 topic echo /hands/left/markers --once`.
+- Visualization feels delayed:
+  - Keep `enable_pose_array=false`.
+  - Prefer marker-only visualization and `best_effort` for non-RViz runs.
+- TF missing:
+  - Ensure `enable_tf=true`.
+  - Confirm frame names: `world`, `left_wrist`, `right_wrist`.
+- Python dependency mismatch:
+  - Install `hand-tracking-sdk` into the same interpreter/environment as ROS 2.
 
 ## Architecture
 
