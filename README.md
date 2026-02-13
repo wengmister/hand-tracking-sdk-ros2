@@ -84,6 +84,15 @@ ros2 launch hand_tracking_sdk_ros2 view_hands.launch.py
 - `enable_tf`, `enable_pose_array`, `enable_markers`, `enable_diagnostics`
 - `diagnostics_period_s`, `queue_size`
 
+## QoS Recommendations
+
+- `best_effort` (recommended default for live tracking):
+  - Better for high-rate streams (~70 Hz) on unstable Wi-Fi.
+  - Minimizes latency and avoids back-pressure from retransmits.
+- `reliable`:
+  - Better for wired LAN/localhost and tooling sessions where delivery completeness matters.
+  - Recommended when launching RViz with `view_hands.launch.py`.
+
 ## Architecture
 
 - `bridge_node.py`: node orchestration, params, publications, diagnostics.

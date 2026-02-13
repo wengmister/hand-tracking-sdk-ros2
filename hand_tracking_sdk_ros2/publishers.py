@@ -25,9 +25,11 @@ def sensor_qos_profile(reliability_mode: str) -> QoSProfile:
     :raises ValueError:
         If the reliability mode is unsupported.
     """
-    if reliability_mode == "best_effort":
+    mode = reliability_mode.strip().lower()
+
+    if mode == "best_effort":
         reliability = ReliabilityPolicy.BEST_EFFORT
-    elif reliability_mode == "reliable":
+    elif mode == "reliable":
         reliability = ReliabilityPolicy.RELIABLE
     else:
         raise ValueError(

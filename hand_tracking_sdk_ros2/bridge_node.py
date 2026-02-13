@@ -58,7 +58,7 @@ class HandTrackingBridgeNode(Node):
         self._landmarks_are_wrist_relative = bool(
             self.get_parameter("landmarks_are_wrist_relative").value
         )
-        qos_reliability = str(self.get_parameter("qos_reliability").value)
+        qos_reliability = str(self.get_parameter("qos_reliability").value).strip().lower()
         queue_size = int(self.get_parameter("queue_size").value)
         self._enable_tf = bool(self.get_parameter("enable_tf").value)
         self._enable_pose_array = bool(self.get_parameter("enable_pose_array").value)
