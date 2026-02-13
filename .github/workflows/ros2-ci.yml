@@ -1,30 +1,8 @@
 name: ROS 2 CI
 
 on:
-  push:
-    paths:
-      - 'hand_tracking_sdk_ros2/**'
-      - 'launch/**'
-      - 'config/**'
-      - 'rviz/**'
-      - 'test/**'
-      - 'package.xml'
-      - 'setup.py'
-      - 'setup.cfg'
-      - 'README.md'
-      - '.github/workflows/ros2-ci.yml'
-  pull_request:
-    paths:
-      - 'hand_tracking_sdk_ros2/**'
-      - 'launch/**'
-      - 'config/**'
-      - 'rviz/**'
-      - 'test/**'
-      - 'package.xml'
-      - 'setup.py'
-      - 'setup.cfg'
-      - 'README.md'
-      - '.github/workflows/ros2-ci.yml'
+  release:
+    types: [published]
   workflow_dispatch:
 
 jobs:
@@ -51,12 +29,12 @@ jobs:
 
       - name: Install system dependencies
         run: |
-          set -eux
+          set -eo pipefail
           mkdir -p ws/src
           ln -s "${GITHUB_WORKSPACE}" ws/src/hand_tracking_sdk_ros2
           cd ws
           sudo apt-get update
-          rosdep update
+          rosdep update || rosdep update
           rosdep install --from-paths src --ignore-src -r -y
 
       - name: Install Python SDK dependency
@@ -66,16 +44,18 @@ jobs:
 
       - name: Build package
         run: |
-          set -eux
+          set -eo pipefail
           cd ws
+          : "${AMENT_TRACE_SETUP_FILES:=}"
           source /opt/ros/${{ matrix.ros_distro }}/setup.bash
           colcon build --symlink-install --packages-select hand_tracking_sdk_ros2
 
-      - name: Run pytest suite (style lint deferred)
+      - name: Run package tests (style lint deferred)
         run: |
-          set -eux
+          set -eo pipefail
           cd ws
+          : "${AMENT_TRACE_SETUP_FILES:=}"
           source /opt/ros/${{ matrix.ros_distro }}/setup.bash
           source install/setup.bash
-          cd src/hand_tracking_sdk_ros2
-          python3 -m pytest -q -k "not test_flake8"
+          colcon test --packages-select hand_tracking_sdk_ros2 --pytest-args "-k not test_flake8"
+          colcon test-result --verbose --all
