@@ -68,8 +68,10 @@ ros2 launch hand_tracking_sdk_ros2 view_hands.launch.py
 - TF:
   - wrist TF is published to `/tf` as `world -> left_wrist|right_wrist`
 - Marker visualization:
-  - per-joint `SPHERE` markers plus `LINE_LIST` bones
+  - one `SPHERE_LIST` marker plus one `LINE_LIST` marker per hand
   - left hand: blue, right hand: red
+- Stream toggles:
+  - `enable_pose_array: false` by default (use markers for RViz visualization)
 - QoS:
   - bridge default is `best_effort` (`bridge.params.yaml`)
   - RViz launch overrides to `reliable`

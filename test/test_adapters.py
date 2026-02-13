@@ -193,7 +193,7 @@ def test_landmarks_pose_array_uses_flu_mapping() -> None:
 
 
 def test_marker_array_for_left_contains_expected_markers_and_color() -> None:
-    """Marker conversion should emit spheres and bone lines with left-hand color."""
+    """Marker conversion should emit batched spheres and bones for left hand."""
     frame = _frame_with_points(
         side=HandSide.LEFT,
         wrist=WristPose(x=0.0, y=0.0, z=0.0, qx=0.0, qy=0.0, qz=0.0, qw=1.0),
@@ -208,12 +208,13 @@ def test_marker_array_for_left_contains_expected_markers_and_color() -> None:
         landmarks_are_wrist_relative=False,
     )
 
-    assert len(marker_array.markers) == 22
+    assert len(marker_array.markers) == 2
     first = marker_array.markers[0]
     bones = marker_array.markers[-1]
 
-    assert first.type == Marker.SPHERE
+    assert first.type == Marker.SPHERE_LIST
     assert first.ns == 'left_landmark_spheres'
+    assert len(first.points) == 21
     assert first.color.r == 0.2
     assert first.color.g == 0.4
     assert first.color.b == 1.0

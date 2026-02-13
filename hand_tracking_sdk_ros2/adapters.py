@@ -177,30 +177,28 @@ def to_marker_array(
         color_g = 0.2
         color_b = 0.2
 
-    for idx, (x, y, z) in enumerate(points):
-        joint_marker = Marker()
-        joint_marker.header = make_header(stamp=stamp, frame_id=frame_id)
-        joint_marker.ns = f"{side_ns}_landmark_spheres"
-        joint_marker.id = idx
-        joint_marker.type = Marker.SPHERE
-        joint_marker.action = Marker.ADD
-        joint_marker.pose.position.x = x
-        joint_marker.pose.position.y = y
-        joint_marker.pose.position.z = z
-        joint_marker.pose.orientation.w = 1.0
-        joint_marker.scale.x = 0.012
-        joint_marker.scale.y = 0.012
-        joint_marker.scale.z = 0.012
-        joint_marker.color.r = color_r
-        joint_marker.color.g = color_g
-        joint_marker.color.b = color_b
-        joint_marker.color.a = 1.0
-        marker_array.markers.append(joint_marker)
+    joint_marker = Marker()
+    joint_marker.header = make_header(stamp=stamp, frame_id=frame_id)
+    joint_marker.ns = f"{side_ns}_landmark_spheres"
+    joint_marker.id = 0
+    joint_marker.type = Marker.SPHERE_LIST
+    joint_marker.action = Marker.ADD
+    joint_marker.pose.orientation.w = 1.0
+    joint_marker.scale.x = 0.012
+    joint_marker.scale.y = 0.012
+    joint_marker.scale.z = 0.012
+    joint_marker.color.r = color_r
+    joint_marker.color.g = color_g
+    joint_marker.color.b = color_b
+    joint_marker.color.a = 1.0
+    for x, y, z in points:
+        joint_marker.points.append(Point(x=x, y=y, z=z))
+    marker_array.markers.append(joint_marker)
 
     line_marker = Marker()
     line_marker.header = make_header(stamp=stamp, frame_id=frame_id)
     line_marker.ns = f"{side_ns}_bones"
-    line_marker.id = 1000
+    line_marker.id = 1
     line_marker.type = Marker.LINE_LIST
     line_marker.action = Marker.ADD
     line_marker.scale.x = 0.004
