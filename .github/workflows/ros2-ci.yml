@@ -1,0 +1,81 @@
+name: ROS 2 CI
+
+on:
+  push:
+    paths:
+      - 'hand_tracking_sdk_ros2/**'
+      - 'launch/**'
+      - 'config/**'
+      - 'rviz/**'
+      - 'test/**'
+      - 'package.xml'
+      - 'setup.py'
+      - 'setup.cfg'
+      - 'README.md'
+      - '.github/workflows/ros2-ci.yml'
+  pull_request:
+    paths:
+      - 'hand_tracking_sdk_ros2/**'
+      - 'launch/**'
+      - 'config/**'
+      - 'rviz/**'
+      - 'test/**'
+      - 'package.xml'
+      - 'setup.py'
+      - 'setup.cfg'
+      - 'README.md'
+      - '.github/workflows/ros2-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.ros_distro }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ros_distro: humble
+            os: ubuntu-22.04
+          - ros_distro: jazzy
+            os: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup ROS
+        uses: ros-tooling/setup-ros@v0.7
+        with:
+          required-ros-distributions: ${{ matrix.ros_distro }}
+
+      - name: Install system dependencies
+        run: |
+          set -eux
+          mkdir -p ws/src
+          ln -s "${GITHUB_WORKSPACE}" ws/src/hand_tracking_sdk_ros2
+          cd ws
+          sudo apt-get update
+          rosdep update
+          rosdep install --from-paths src --ignore-src -r -y
+
+      - name: Install Python SDK dependency
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install "hand-tracking-sdk>=1.0.0,<2.0.0"
+
+      - name: Build package
+        run: |
+          set -eux
+          cd ws
+          source /opt/ros/${{ matrix.ros_distro }}/setup.bash
+          colcon build --symlink-install --packages-select hand_tracking_sdk_ros2
+
+      - name: Run pytest suite (style lint deferred)
+        run: |
+          set -eux
+          cd ws
+          source /opt/ros/${{ matrix.ros_distro }}/setup.bash
+          source install/setup.bash
+          cd src/hand_tracking_sdk_ros2
+          python3 -m pytest -q -k "not test_flake8"
