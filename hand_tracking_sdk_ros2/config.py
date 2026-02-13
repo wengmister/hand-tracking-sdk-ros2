@@ -18,7 +18,7 @@ class BridgeConfig:
     left_wrist_frame: str
     right_wrist_frame: str
     use_source_frame_id: bool
-    convert_to_right_handed: bool
+    landmarks_are_wrist_relative: bool
     qos_reliability: str
     queue_size: int
     enable_tf: bool

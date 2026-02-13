@@ -11,7 +11,6 @@ from hand_tracking_sdk import (
     HTSClientConfig,
     StreamOutput,
     TransportMode,
-    convert_hand_frame_unity_left_to_right,
 )
 from hand_tracking_sdk.frame import HandFrame
 
@@ -37,10 +36,8 @@ class FrameRuntime:
         port: int,
         timeout_s: float,
         reconnect_delay_s: float,
-        convert_to_right_handed: bool,
         queue_size: int,
     ) -> None:
-        self._convert_to_right_handed = convert_to_right_handed
         self._queue: deque[HandFrame] = deque(maxlen=queue_size)
         self._queue_lock = threading.Lock()
         self._stats = RuntimeStats()
@@ -104,8 +101,6 @@ class FrameRuntime:
                     return
 
                 frame = event
-                if self._convert_to_right_handed:
-                    frame = convert_hand_frame_unity_left_to_right(frame)
 
                 dropped = 0
                 with self._queue_lock:

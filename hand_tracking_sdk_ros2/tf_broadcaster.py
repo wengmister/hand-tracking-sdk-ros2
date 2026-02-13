@@ -20,7 +20,6 @@ class WristTfPublisher:
         world_frame: str,
         left_wrist_frame: str,
         right_wrist_frame: str,
-        map_to_flu: bool,
     ) -> None:
         """Create TF publisher with configured frame names."""
         self._broadcaster = broadcaster
@@ -28,7 +27,6 @@ class WristTfPublisher:
         self._world_frame = world_frame
         self._left_wrist_frame = left_wrist_frame
         self._right_wrist_frame = right_wrist_frame
-        self._map_to_flu = map_to_flu
 
     def publish(self, frame: HandFrame, stamp: Time) -> None:
         """Publish one transform if TF output is enabled."""
@@ -45,6 +43,5 @@ class WristTfPublisher:
             stamp=stamp,
             world_frame=self._world_frame,
             child_frame_id=child_frame_id,
-            map_to_flu=self._map_to_flu,
         )
         self._broadcaster.sendTransform(transform)

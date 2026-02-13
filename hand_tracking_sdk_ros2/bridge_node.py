@@ -37,8 +37,6 @@ class HandTrackingBridgeNode(Node):
         self.declare_parameter("left_wrist_frame", "left_wrist")
         self.declare_parameter("right_wrist_frame", "right_wrist")
         self.declare_parameter("use_source_frame_id", False)
-        self.declare_parameter("convert_to_right_handed", True)
-        self.declare_parameter("map_to_flu", True)
         self.declare_parameter("landmarks_are_wrist_relative", True)
         self.declare_parameter("qos_reliability", "best_effort")
         self.declare_parameter("queue_size", 256)
@@ -57,8 +55,6 @@ class HandTrackingBridgeNode(Node):
         self._left_wrist_frame = str(self.get_parameter("left_wrist_frame").value)
         self._right_wrist_frame = str(self.get_parameter("right_wrist_frame").value)
         self._use_source_frame_id = bool(self.get_parameter("use_source_frame_id").value)
-        convert_to_right_handed = bool(self.get_parameter("convert_to_right_handed").value)
-        self._map_to_flu = bool(self.get_parameter("map_to_flu").value)
         self._landmarks_are_wrist_relative = bool(
             self.get_parameter("landmarks_are_wrist_relative").value
         )
@@ -69,12 +65,6 @@ class HandTrackingBridgeNode(Node):
         self._enable_markers = bool(self.get_parameter("enable_markers").value)
         self._enable_diagnostics = bool(self.get_parameter("enable_diagnostics").value)
         diagnostics_period_s = float(self.get_parameter("diagnostics_period_s").value)
-
-        if self._map_to_flu and not convert_to_right_handed:
-            raise ValueError(
-                "map_to_flu=true requires convert_to_right_handed=true so FLU mapping uses "
-                "right-handed SDK coordinates."
-            )
 
         qos = sensor_qos_profile(qos_reliability)
 
@@ -93,7 +83,6 @@ class HandTrackingBridgeNode(Node):
             world_frame=self._world_frame,
             left_wrist_frame=self._left_wrist_frame,
             right_wrist_frame=self._right_wrist_frame,
-            map_to_flu=self._map_to_flu,
         )
         self._diagnostics = DiagnosticsPublisher(self)
 
@@ -103,7 +92,6 @@ class HandTrackingBridgeNode(Node):
             port=port,
             timeout_s=timeout_s,
             reconnect_delay_s=reconnect_delay_s,
-            convert_to_right_handed=convert_to_right_handed,
             queue_size=queue_size,
         )
         self._runtime.start()
@@ -153,7 +141,6 @@ class HandTrackingBridgeNode(Node):
                 frame,
                 stamp=stamp,
                 frame_id=frame_id,
-                map_to_flu=self._map_to_flu,
             )
             self._bridge_publishers.publish_wrist(frame.side, wrist_msg)
 
@@ -167,7 +154,6 @@ class HandTrackingBridgeNode(Node):
                 stamp=stamp,
                 frame_id=landmarks_frame_id,
                 landmarks_are_wrist_relative=self._landmarks_are_wrist_relative,
-                map_to_flu=self._map_to_flu,
             )
             self._bridge_publishers.publish_landmarks(frame.side, landmarks_msg)
 
@@ -177,7 +163,6 @@ class HandTrackingBridgeNode(Node):
                 frame_id=landmarks_frame_id,
                 side_ns=frame.side.value.lower(),
                 landmarks_are_wrist_relative=self._landmarks_are_wrist_relative,
-                map_to_flu=self._map_to_flu,
             )
             self._bridge_publishers.publish_markers(frame.side, markers_msg)
 

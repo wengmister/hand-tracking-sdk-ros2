@@ -62,8 +62,7 @@ ros2 launch hand_tracking_sdk_ros2 view_hands.launch.py
 ## Default Behavior
 
 - Frame normalization:
-  - `convert_to_right_handed: true`
-  - `map_to_flu: true`
+  - Unity-left input is mapped directly to FLU for published poses/TF/markers
 - Landmark semantics:
   - `landmarks_are_wrist_relative: true` (landmarks are transformed into world frame before publish)
 - TF:
@@ -80,7 +79,7 @@ ros2 launch hand_tracking_sdk_ros2 view_hands.launch.py
 - `transport_mode`: `tcp_server` or `udp_client`
 - `host`, `port`, `timeout_s`, `reconnect_delay_s`
 - `world_frame`, `left_wrist_frame`, `right_wrist_frame`
-- `convert_to_right_handed`, `map_to_flu`, `landmarks_are_wrist_relative`
+- `landmarks_are_wrist_relative`
 - `qos_reliability`: `best_effort` or `reliable`
 - `enable_tf`, `enable_pose_array`, `enable_markers`, `enable_diagnostics`
 - `diagnostics_period_s`, `queue_size`

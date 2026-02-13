@@ -8,7 +8,7 @@ from builtin_interfaces.msg import Time
 from geometry_msgs.msg import Point, Pose, PoseArray, PoseStamped, Quaternion, TransformStamped
 from hand_tracking_sdk import HandFrame, HandSide, JointName
 from hand_tracking_sdk import (
-    unity_right_to_flu_position,
+    unity_left_to_flu_position,
 )
 from std_msgs.msg import Header
 from visualization_msgs.msg import Marker, MarkerArray
@@ -54,21 +54,18 @@ def to_wrist_pose_stamped(
     *,
     stamp: Time,
     frame_id: str,
-    map_to_flu: bool = False,
 ) -> PoseStamped:
     """Convert one SDK frame to wrist pose message."""
     x, y, z = _map_point_frame(
         x=frame.wrist.x,
         y=frame.wrist.y,
         z=frame.wrist.z,
-        map_to_flu=map_to_flu,
     )
     qx, qy, qz, qw = _map_quaternion_frame(
         qx=frame.wrist.qx,
         qy=frame.wrist.qy,
         qz=frame.wrist.qz,
         qw=frame.wrist.qw,
-        map_to_flu=map_to_flu,
     )
 
     return PoseStamped(
@@ -91,7 +88,6 @@ def to_landmarks_pose_array(
     stamp: Time,
     frame_id: str,
     landmarks_are_wrist_relative: bool = False,
-    map_to_flu: bool = False,
 ) -> PoseArray:
     """Convert one SDK frame to landmarks ``PoseArray`` in publish coordinates."""
     points = frame.landmarks.points
@@ -103,7 +99,6 @@ def to_landmarks_pose_array(
             x=x,
             y=y,
             z=z,
-            map_to_flu=map_to_flu,
         )
         for x, y, z in points
     ]
@@ -123,21 +118,18 @@ def to_wrist_transform(
     stamp: Time,
     world_frame: str,
     child_frame_id: str,
-    map_to_flu: bool = False,
 ) -> TransformStamped:
     """Convert one SDK frame to wrist transform."""
     x, y, z = _map_point_frame(
         x=frame.wrist.x,
         y=frame.wrist.y,
         z=frame.wrist.z,
-        map_to_flu=map_to_flu,
     )
     qx, qy, qz, qw = _map_quaternion_frame(
         qx=frame.wrist.qx,
         qy=frame.wrist.qy,
         qz=frame.wrist.qz,
         qw=frame.wrist.qw,
-        map_to_flu=map_to_flu,
     )
 
     transform = TransformStamped()
@@ -160,7 +152,6 @@ def to_marker_array(
     frame_id: str,
     side_ns: str,
     landmarks_are_wrist_relative: bool = False,
-    map_to_flu: bool = False,
 ) -> MarkerArray:
     """Build landmark and bone markers for RViz."""
     points = frame.landmarks.points
@@ -171,7 +162,6 @@ def to_marker_array(
             x=x,
             y=y,
             z=z,
-            map_to_flu=map_to_flu,
         )
         for x, y, z in points
     )
@@ -239,12 +229,9 @@ def _map_point_frame(
     x: float,
     y: float,
     z: float,
-    map_to_flu: bool,
 ) -> tuple[float, float, float]:
-    """Map SDK coordinates to FLU frame when requested."""
-    if not map_to_flu:
-        return (x, y, z)
-    return unity_right_to_flu_position(x, y, z)
+    """Map SDK Unity-left coordinates to FLU frame."""
+    return unity_left_to_flu_position(x, y, z)
 
 
 def _map_quaternion_frame(
@@ -253,17 +240,13 @@ def _map_quaternion_frame(
     qy: float,
     qz: float,
     qw: float,
-    map_to_flu: bool,
 ) -> tuple[float, float, float, float]:
-    """Map SDK quaternion basis to FLU frame when requested."""
-    if not map_to_flu:
-        return (qx, qy, qz, qw)
-
+    """Map SDK Unity-left quaternion basis to FLU frame."""
     matrix = _quaternion_to_matrix(qx=qx, qy=qy, qz=qz, qw=qw)
     basis = (
         (0.0, 0.0, 1.0),
         (-1.0, 0.0, 0.0),
-        (0.0, -1.0, 0.0),
+        (0.0, 1.0, 0.0),
     )
     transformed = _matmul(_matmul(basis, matrix), _transpose(basis))
     return _matrix_to_quaternion(transformed)
