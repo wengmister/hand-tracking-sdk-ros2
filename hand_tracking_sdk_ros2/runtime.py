@@ -23,6 +23,9 @@ class RuntimeStats:
     frames_dropped_queue: int = 0
     frames_out: int = 0
     loop_errors: int = 0
+    parse_errors: int = 0
+    dropped_lines: int = 0
+    callback_errors: int = 0
 
 
 class FrameRuntime:
@@ -78,11 +81,15 @@ class FrameRuntime:
             if not self._queue:
                 return None
             frame = self._queue.popleft()
+        client_stats = self._client.get_stats()
         self._stats = RuntimeStats(
             frames_in=self._stats.frames_in,
             frames_dropped_queue=self._stats.frames_dropped_queue,
             frames_out=self._stats.frames_out + 1,
             loop_errors=self._stats.loop_errors,
+            parse_errors=client_stats.parse_errors,
+            dropped_lines=client_stats.dropped_lines,
+            callback_errors=client_stats.callback_errors,
         )
         return frame
 
@@ -109,17 +116,25 @@ class FrameRuntime:
                         dropped = 1
                     self._queue.append(frame)
 
+                client_stats = self._client.get_stats()
                 self._stats = RuntimeStats(
                     frames_in=self._stats.frames_in + 1,
                     frames_dropped_queue=self._stats.frames_dropped_queue + dropped,
                     frames_out=self._stats.frames_out,
                     loop_errors=self._stats.loop_errors,
+                    parse_errors=client_stats.parse_errors,
+                    dropped_lines=client_stats.dropped_lines,
+                    callback_errors=client_stats.callback_errors,
                 )
         except Exception as exc:  # pragma: no cover - integration path
             self._last_exception = exc
+            client_stats = self._client.get_stats()
             self._stats = RuntimeStats(
                 frames_in=self._stats.frames_in,
                 frames_dropped_queue=self._stats.frames_dropped_queue,
                 frames_out=self._stats.frames_out,
                 loop_errors=self._stats.loop_errors + 1,
+                parse_errors=client_stats.parse_errors,
+                dropped_lines=client_stats.dropped_lines,
+                callback_errors=client_stats.callback_errors,
             )
